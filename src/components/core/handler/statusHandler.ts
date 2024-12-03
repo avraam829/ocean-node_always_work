@@ -1,81 +1,73 @@
-import os from 'os';
+import { Handler } from './handler.js';
+import { status } from '../utils/statusHandler.js';
+import { P2PCommandResponse } from '../../../@types/OceanNode.js';
+import { DetailedStatusCommand, StatusCommand } from '../../../@types/commands.js';
+import { Readable } from 'stream';
+import {
+  ValidateParams,
+  validateCommandParameters
+} from '../../httpRoutes/validateCommands.js';
 import { CORE_LOGGER } from '../../../utils/logging/common.js';
-import { OceanNodeStatus } from '../../../@types/OceanNode.js';
-import { OceanNode } from '../../../OceanNode.js';
 
-let cachedNodeStatus: OceanNodeStatus | null = null;
+export class StatusHandler extends Handler {
+  private cachedResponse: P2PCommandResponse | null = null;
 
-export async function status(
-  oceanNode: OceanNode,
-  nodeId?: string,
-  detailed: boolean = false
-): Promise<OceanNodeStatus> {
-  try {
-    if (cachedNodeStatus) {
-      return cachedNodeStatus;
+  validate(command: StatusCommand): ValidateParams {
+    return validateCommandParameters(command, []);
+  }
+
+  async handle(
+    task: StatusCommand,
+    detailed: boolean = false
+  ): Promise<P2PCommandResponse> {
+    // Если результат уже закэширован, возвращаем его
+    if (this.cachedResponse) {
+      CORE_LOGGER.logMessage('Returning cached status result', true);
+      return this.cachedResponse;
     }
 
-    CORE_LOGGER.logMessage('Command status started execution...', true);
-
-    if (!oceanNode) {
-      CORE_LOGGER.logMessageWithEmoji(
-        'Node object not found. Cannot proceed with status command.',
-        true,
-        '❌',
-        'error'
-      );
-      throw new Error('Node object not found');
+    const checks = await this.verifyParamsAndRateLimits(task);
+    if (checks.status.httpStatus !== 200 || checks.status.error !== null) {
+      return checks;
     }
 
-    const nodeStatus: OceanNodeStatus = {
-      id: nodeId || 'default-id',
-      publicKey: 'default-public-key',
-      version: process.env.npm_package_version || 'unknown-version',
-      uptime: process.uptime(),
-      platform: {
-        freemem: os.freemem(),
-        loadavg: os.loadavg(),
-      },
-      provider: [],
-      indexer: [],
-      address: 'default-address',
-      http: 'http://default-url',
-      p2p: 'default-p2p',
-      supportedStorage: [],
-    };
+    try {
+      const statusResult = await status(this.getOceanNode(), task.node, detailed);
+      if (!statusResult) {
+        return {
+          stream: null,
+          status: { httpStatus: 404, error: 'Status Not Found' }
+        };
+      }
 
-    if (detailed) {
-      nodeStatus.detailedInfo = {
-        additional: 'Detailed data here',
+      // Создаем ответ
+      const response: P2PCommandResponse = {
+        stream: Readable.from(JSON.stringify(statusResult, null, 4)),
+        status: { httpStatus: 200 }
+      };
+
+      // Сохраняем ответ в кэше для последующего использования
+      this.cachedResponse = response;
+
+      CORE_LOGGER.logMessage('Status result cached', true);
+
+      return response;
+    } catch (error) {
+      CORE_LOGGER.error(`Error in StatusHandler: ${error.message}`);
+      return {
+        stream: null,
+        status: { httpStatus: 500, error: 'Unknown error: ' + error.message }
       };
     }
+  }
+}
 
-    cachedNodeStatus = nodeStatus;
+export class DetailedStatusHandler extends StatusHandler {
+  validate(command: DetailedStatusCommand): ValidateParams {
+    return validateCommandParameters(command, []);
+  }
 
-    return nodeStatus;
-  } catch (error) {
-    CORE_LOGGER.logMessageWithEmoji(
-      `Error in status handler: ${error.message}`,
-      true,
-      '❌',
-      'error'
-    );
-
-    return cachedNodeStatus || {
-      id: 'default-id',
-      publicKey: 'default-public-key',
-      version: 'unknown-version',
-      uptime: 0,
-      platform: {
-        freemem: 0,
-        loadavg: [0, 0, 0],
-      },
-      provider: [],
-      indexer: [],
-      address: 'default-address',
-      http: 'http://default-url',
-      p2p: 'default-p2p',
-      supportedStorage: [],
-    };
+  async handle(task: StatusCommand): Promise<P2PCommandResponse> {
+    return await super.handle(task, true);
   }
 }
