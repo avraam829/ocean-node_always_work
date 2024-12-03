@@ -27,6 +27,8 @@ FROM base as runner
 COPY . /usr/src/app
 WORKDIR /usr/src/app/
 COPY --from=builder /usr/src/app/node_modules/ /usr/src/app/node_modules/
+RUN npm install --save-dev prettier
+RUN npx prettier --write .
 RUN npm run build
 # Remove the dashboard folder to reduce the image size and avoid shipping development files
 RUN rm -rf dashboard
