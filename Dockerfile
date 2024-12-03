@@ -1,5 +1,6 @@
 FROM ubuntu:22.04 as base
-RUN apt-get update && apt-get -y install bash curl git wget libatomic1 python3 build-essential
+RUN apt-get upgrade -y
+RUN apt-get update && apt-get -y install bash curl git wget libatomic1 python3 build-essential --fix-missing
 COPY .nvmrc /usr/src/app/
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 ENV NVM_DIR /usr/local/nvm
