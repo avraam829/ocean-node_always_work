@@ -53,10 +53,10 @@ export class StatusHandler extends Handler {
 
       return response;
     } catch (error) {
-      CORE_LOGGER.error(`Error in StatusHandler: ${error.message}`);
+      CORE_LOGGER.error(`Error in StatusHandler: ${(error as Error).message}`);
       return {
         stream: null,
-        status: { httpStatus: 500, error: 'Unknown error: ' + error.message }
+        status: { httpStatus: 500, error: 'Unknown error: ' + (error as Error).message }
       };
     }
   }
