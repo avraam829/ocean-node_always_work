@@ -1,55 +1,79 @@
-import { Handler } from './handler.js'
-import { status } from '../utils/statusHandler.js'
-import { P2PCommandResponse } from '../../../@types/OceanNode.js'
-import { DetailedStatusCommand, StatusCommand } from '../../../@types/commands.js'
-import { Readable } from 'stream'
-import {
-  ValidateParams,
-  validateCommandParameters
-} from '../../httpRoutes/validateCommands.js'
-import { CORE_LOGGER } from '../../../utils/logging/common.js'
+import os from 'os';
+import { CORE_LOGGER } from '../../../utils/logging/common.js';
+import { OceanNodeStatus } from '../../../@types/OceanNode.js';
+import { OceanNode } from '../../../OceanNode.js';
 
-export class StatusHandler extends Handler {
-  validate(command: StatusCommand): ValidateParams {
-    return validateCommandParameters(command, [])
-  }
+// Переменная для хранения кэшированного статуса узла
+let cachedNodeStatus: OceanNodeStatus | null = null;
 
-  async handle(
-    task: StatusCommand,
-    detailed: boolean = false
-  ): Promise<P2PCommandResponse> {
-    const checks = await this.verifyParamsAndRateLimits(task)
-    if (checks.status.httpStatus !== 200 || checks.status.error !== null) {
-      return checks
+export async function status(
+  oceanNode: OceanNode,
+  nodeId?: string,
+  detailed: boolean = false
+): Promise<OceanNodeStatus> {
+  try {
+    // Если статус уже сохранён, возвращаем кэшированные данные
+    if (cachedNodeStatus) {
+      return cachedNodeStatus;
     }
-    try {
-      const statusResult = await status(this.getOceanNode(), task.node, detailed)
-      if (!statusResult) {
-        return {
-          stream: null,
-          status: { httpStatus: 404, error: 'Status Not Found' }
-        }
-      }
-      return {
-        stream: Readable.from(JSON.stringify(statusResult, null, 4)),
-        status: { httpStatus: 200 }
-      }
-    } catch (error) {
-      CORE_LOGGER.error(`Error in StatusHandler: ${error.message}`)
-      return {
-        stream: null,
-        status: { httpStatus: 500, error: 'Unknown error: ' + error.message }
-      }
+
+    CORE_LOGGER.logMessage('Command status started execution...', true);
+
+    if (!oceanNode) {
+      CORE_LOGGER.logMessageWithEmoji(
+        'Node object not found. Cannot proceed with status command.',
+        true,
+        '❌',
+        'error'
+      );
+      throw new Error('Node object not found');
     }
-  }
-}
 
-export class DetailedStatusHandler extends StatusHandler {
-  validate(command: DetailedStatusCommand): ValidateParams {
-    return validateCommandParameters(command, [])
-  }
+    // Сбор данных о состоянии узла
+    const nodeStatus: OceanNodeStatus = {
+      id: nodeId || 'default-id',
+      publicKey: 'default-public-key',
+      version: process.env.npm_package_version || 'unknown-version',
+      uptime: process.uptime(),
+      platform: {
+        freemem: os.freemem(),
+        loadavg: os.loadavg(),
+      },
+      provider: [],
+      indexer: [],
+    };
 
-  async handle(task: StatusCommand): Promise<P2PCommandResponse> {
-    return await super.handle(task, true)
+    // Если требуется, добавляем детальную информацию
+    if (detailed) {
+      nodeStatus.detailedInfo = {
+        additional: 'Detailed data here',
+      };
+    }
+
+    // Сохраняем кэшированные данные
+    cachedNodeStatus = nodeStatus;
+
+    return nodeStatus;
+  } catch (error) {
+    CORE_LOGGER.logMessageWithEmoji(
+      `Error in status handler: ${error.message}`,
+      true,
+      '❌',
+      'error'
+    );
+
+    // Возвращаем кэшированные данные или дефолтное значение
+    return cachedNodeStatus || {
+      id: 'default-id',
+      publicKey: 'default-public-key',
+      version: 'unknown-version',
+      uptime: 0,
+      platform: {
+        freemem: 0,
+        loadavg: [0, 0, 0],
+      },
+      provider: [],
+      indexer: [],
+    };
   }
 }
