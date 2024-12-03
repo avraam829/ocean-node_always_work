@@ -11,7 +11,6 @@ export async function status(
   detailed: boolean = false
 ): Promise<OceanNodeStatus> {
   try {
-
     if (cachedNodeStatus) {
       return cachedNodeStatus;
     }
@@ -39,6 +38,10 @@ export async function status(
       },
       provider: [],
       indexer: [],
+      address: 'default-address',
+      http: 'http://default-url',
+      p2p: 'default-p2p',
+      supportedStorage: [],
     };
 
     if (detailed) {
@@ -69,6 +72,10 @@ export async function status(
       },
       provider: [],
       indexer: [],
+      address: 'default-address',
+      http: 'http://default-url',
+      p2p: 'default-p2p',
+      supportedStorage: [],
     };
   }
 }
