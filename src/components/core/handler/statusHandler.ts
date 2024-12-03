@@ -3,7 +3,6 @@ import { CORE_LOGGER } from '../../../utils/logging/common.js';
 import { OceanNodeStatus } from '../../../@types/OceanNode.js';
 import { OceanNode } from '../../../OceanNode.js';
 
-// Переменная для хранения кэшированного статуса узла
 let cachedNodeStatus: OceanNodeStatus | null = null;
 
 export async function status(
@@ -12,7 +11,7 @@ export async function status(
   detailed: boolean = false
 ): Promise<OceanNodeStatus> {
   try {
-    // Если статус уже сохранён, возвращаем кэшированные данные
+
     if (cachedNodeStatus) {
       return cachedNodeStatus;
     }
@@ -29,7 +28,6 @@ export async function status(
       throw new Error('Node object not found');
     }
 
-    // Сбор данных о состоянии узла
     const nodeStatus: OceanNodeStatus = {
       id: nodeId || 'default-id',
       publicKey: 'default-public-key',
@@ -43,14 +41,12 @@ export async function status(
       indexer: [],
     };
 
-    // Если требуется, добавляем детальную информацию
     if (detailed) {
       nodeStatus.detailedInfo = {
         additional: 'Detailed data here',
       };
     }
 
-    // Сохраняем кэшированные данные
     cachedNodeStatus = nodeStatus;
 
     return nodeStatus;
@@ -62,7 +58,6 @@ export async function status(
       'error'
     );
 
-    // Возвращаем кэшированные данные или дефолтное значение
     return cachedNodeStatus || {
       id: 'default-id',
       publicKey: 'default-public-key',
